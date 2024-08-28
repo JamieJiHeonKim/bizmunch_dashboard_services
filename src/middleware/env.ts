@@ -12,7 +12,7 @@ export const IS_PRODUCTION = ENVIRONMENT === 'production';
 
 if (!process.env.SESSION_SECRET) {
   Logger.warn('SESSION_SECRET IS UNDEFINED AT ENV FILE');
-  process.exit(1);
+  // process.exit(1);
 }
 
 
@@ -21,7 +21,7 @@ if (!process.env.SESSION_SECRET) {
 
 if (!process.env.JWT_SECRET) {
   Logger.warn('JWT_SECRET IS UNDEFINED AT ENV FILE');
-  process.exit(1);
+  // process.exit(1);
 }
 
 
