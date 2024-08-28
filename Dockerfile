@@ -13,9 +13,6 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
-# Set environment variables (optional if you want to hardcode)
-ENV SESSION_SECRET=34343434fsfdsfs
-
 # Expose the port the app runs on
 EXPOSE 3001
 
