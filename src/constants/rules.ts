@@ -1,0 +1,298 @@
+import {
+  BOOTH_STATUS_AVAILABLE,
+  BOOTH_STATUS_NOT_AVAILABLE,
+  BOOTH_TYPE_ALLINPRIVATE,
+  BOOTH_TYPE_OPEN,
+  BOOTH_TYPE_OTHER,
+  BOOTH_TYPE_PRIVATE,
+  BOOTH_TYPE_SEMIPRIVATE,
+  ADMIN_BOOTH_PRIVILEGE,
+  ADMIN_SUPER_PRIVILEGE,
+  PAYMENT_METHOD_PAYJP,
+  PAYMENT_METHOD_PAYPAY,
+  PAYMENT_STATUS_CANCEL,
+  PAYMENT_STATUS_PROCEED,
+  PAYMENT_STATUS_REFUND,
+  PAYMENT_STATUS_SUCCESS,
+  POINT_TYPE_CHARGE,
+  POINT_TYPE_USE,
+  RESERVATION_CANCEL_EVENT_CAUSE_0,
+  RESERVATION_CANCEL_EVENT_CAUSE_1,
+  RESERVATION_CANCEL_EVENT_CAUSE_2,
+  RESERVATION_CANCEL_EVENT_CAUSE_3,
+  RESERVATION_CANCEL_EVENT_CAUSE_4,
+  RESERVATION_CANCEL_EVENT_REASON_0,
+  RESERVATION_CANCEL_EVENT_REASON_1,
+  RESERVATION_CANCEL_EVENT_REASON_2,
+  RESERVATION_CANCEL_EVENT_REASON_3,
+  RESERVATION_CANCEL_EVENT_REASON_4,
+  RESERVATION_CANCEL_EVENT_REASON_5,
+  RESERVATION_STATUS_APPLY,
+  RESERVEATION_STATUS_CANCELED,
+  RESERVEATION_STATUS_PROGRESS,
+  RESERVEATION_STATUS_UNDER_RESERVATION,
+  RESERVEATION_STATUS_USED,
+  USAGE_TYPE_BONUS,
+  USAGE_TYPE_CHARGE,
+  USAGE_TYPE_REFUND,
+  USAGE_TYPE_RESERVATION,
+  RESET_TOKEN_TYPES_ADMIN_REGISTRATION_CONFIRM_ADMIN,
+  RESET_TOKEN_TYPES_RESET_PASSWORD,
+  SALON_STATUS_PRIVATE,
+  SALON_STATUS_PUBLIC,
+  SALON_STATUS_DELETE,
+  USER_EXPERIENCE_1,
+  USER_EXPERIENCE_2,
+  USER_EXPERIENCE_3,
+  USER_EXPERIENCE_4,
+  USER_EXPERIENCE_5,
+  USER_GENDER_AGENDER,
+  USER_GENDER_MAN,
+  USER_GENDER_WOMAN,
+  USER_STATUS_ALLOWED,
+  USER_STATUS_APPLYING,
+  USER_STATUS_STOPPED,
+  USER_TYPE_BARBER,
+  USER_TYPE_NAILIST,
+  USER_TYPE_SPALIST,
+  USER_TYPE_STYLIST,
+  RESERVATION_CANCEL_EVENT_REASON_6,
+  ADMIN_BOOTH_PRIVILEGE_APPLYING,
+  SALON_STATUS_APPLY,
+  BOOTH_STATUS_APPLIED,
+} from './language/japan';
+
+export const ADMIN_EMAIL = 'ua1265513@gmail.com';
+
+// Length Related
+export const LENGTH_EMAIL_MAX = 255;
+export const LENGTH_PASSWORD_MIN = 8;
+export const LENGTH_PASSWORD_MAX = 255;
+export const LENGTH_NAME_MIN = 3;
+export const LENGTH_NAME_MAX = 255;
+export const LENGTH_LOWERCASE_MIN = 1;
+export const LENGTH_UPPERCASE_MIN = 1;
+export const LENGTH_NUMBER_MIN = 1;
+export const LENGTH_ID = 7;
+export const LENGTH_ZIPCODE = 7;
+export const LENGTH_URL_MAX = 2048;
+export const LENGTH_LICENSE_NUMBER_MAX = 255;
+
+export const POINT_EXPIRED_DATE = 180;
+
+// Distance Related
+export const KM_TO_METER = 1000;
+
+// Admin Related
+export const ADMIN_AUTHORITY_TYPE_LABELS = [
+  ADMIN_SUPER_PRIVILEGE,
+];
+
+// Booth Related
+export const BOOTH_STATUSES = [BOOTH_STATUS_AVAILABLE, BOOTH_STATUS_NOT_AVAILABLE, BOOTH_STATUS_APPLIED];
+
+export const BOOTH_TYPES = [
+  BOOTH_TYPE_OTHER,
+  BOOTH_TYPE_OPEN,
+  BOOTH_TYPE_PRIVATE,
+  BOOTH_TYPE_SEMIPRIVATE,
+  BOOTH_TYPE_ALLINPRIVATE,
+];
+
+// Payment Related
+export const PAYMENT_METHODS = [PAYMENT_METHOD_PAYJP, PAYMENT_METHOD_PAYPAY];
+
+export const PAYMENT_STATUSES = [
+  PAYMENT_STATUS_PROCEED,
+  PAYMENT_STATUS_SUCCESS,
+  PAYMENT_STATUS_REFUND,
+  PAYMENT_STATUS_CANCEL,
+];
+
+// Price Related
+export const DISCOUNT_TIME = {
+  startTime: '22:00:00',
+  endTime: '10:00:00',
+};
+
+export const SALES_TAX = { add: 1.0, extract: 0.0 };
+export const SERVICE_FEE = { add: 1.15, extract: 0.15 };
+
+export const EXTRACHARGES = [
+  { name: '0%', add: 1.0, extract: 0.0 },
+  { name: '10%', add: 1.1, extract: 0.1 },
+  { name: '20%', add: 1.2, extract: 0.2 },
+  { name: '30%', add: 1.3, extract: 0.3 },
+  { name: '40%', add: 1.4, extract: 0.4 },
+  { name: '50%', add: 1.5, extract: 0.5 },
+  { name: '60%', add: 1.6, extract: 0.6 },
+  { name: '70%', add: 1.7, extract: 0.7 },
+  { name: '80%', add: 1.8, extract: 0.8 },
+  { name: '90%', add: 1.9, extract: 0.9 },
+  { name: '100%', add: 2.0, extract: 1.0 },
+];
+export const DISCOUNTS = [
+  { name: '0%', add: 1.0, extract: 0.0 },
+  { name: '10%', add: 0.9, extract: 0.1 },
+  { name: '20%', add: 0.8, extract: 0.2 },
+  { name: '30%', add: 0.7, extract: 0.3 },
+  { name: '40%', add: 0.6, extract: 0.4 },
+  { name: '50%', add: 0.5, extract: 0.5 },
+  { name: '60%', add: 0.4, extract: 0.6 },
+  { name: '70%', add: 0.3, extract: 0.7 },
+  { name: '80%', add: 0.2, extract: 0.8 },
+  { name: '90%', add: 0.1, extract: 0.9 },
+  { name: '100%', add: 0.0, extract: 1.0 },
+];
+
+export const PERCENTAGE_OPTIONS = ['0%', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', '100%'];
+
+// Reservation Related
+
+export const RESERVATION_STATUSES = [
+  RESERVEATION_STATUS_UNDER_RESERVATION,
+  RESERVEATION_STATUS_PROGRESS,
+  RESERVEATION_STATUS_USED,
+  RESERVEATION_STATUS_CANCELED,
+  RESERVATION_STATUS_APPLY,
+];
+
+export const RESERVATION_CANCEL_EVENT_REASONS = [
+  RESERVATION_CANCEL_EVENT_REASON_0,
+  RESERVATION_CANCEL_EVENT_REASON_1,
+  RESERVATION_CANCEL_EVENT_REASON_2,
+  RESERVATION_CANCEL_EVENT_REASON_3,
+  RESERVATION_CANCEL_EVENT_REASON_4,
+  RESERVATION_CANCEL_EVENT_REASON_5,
+  RESERVATION_CANCEL_EVENT_REASON_6,
+];
+
+export const RESERVATION_CANCEL_EVENT_CAUSES = [
+  RESERVATION_CANCEL_EVENT_CAUSE_0,
+  RESERVATION_CANCEL_EVENT_CAUSE_1,
+  RESERVATION_CANCEL_EVENT_CAUSE_2,
+  RESERVATION_CANCEL_EVENT_CAUSE_3,
+  RESERVATION_CANCEL_EVENT_CAUSE_4,
+];
+
+export const USAGE_TYPES = [USAGE_TYPE_RESERVATION, USAGE_TYPE_BONUS, USAGE_TYPE_CHARGE, USAGE_TYPE_REFUND];
+
+export const POINT_TYPES = [POINT_TYPE_USE, POINT_TYPE_CHARGE];
+
+// Reset Token Related
+export const RESET_TOKEN_TYPES = [RESET_TOKEN_TYPES_RESET_PASSWORD, RESET_TOKEN_TYPES_ADMIN_REGISTRATION_CONFIRM_ADMIN];
+
+// Salon Related
+export const SALON_STATUSES = [SALON_STATUS_PUBLIC, SALON_STATUS_PRIVATE, SALON_STATUS_DELETE, SALON_STATUS_APPLY];
+
+// Time Related
+export const TIMEZONE = 'Asia/Tokyo';
+export const DATE = 'YYYY-MM-DD';
+
+export const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+// User Related
+export const USER_STATUSES = [USER_STATUS_APPLYING, USER_STATUS_ALLOWED, USER_STATUS_STOPPED];
+
+export const USER_TYPES = [USER_TYPE_STYLIST, USER_TYPE_BARBER, USER_TYPE_SPALIST, USER_TYPE_NAILIST];
+
+export const USER_GENDERS = [USER_GENDER_MAN, USER_GENDER_WOMAN, USER_GENDER_AGENDER];
+
+export const USER_EXPERIENCES = [
+  USER_EXPERIENCE_1,
+  USER_EXPERIENCE_2,
+  USER_EXPERIENCE_3,
+  USER_EXPERIENCE_4,
+  USER_EXPERIENCE_5,
+];
+
+export const RESERVATION_TIME_SLOTS = [
+  '0:00',
+  '0:30',
+  '1:00',
+  '1:30',
+  '2:00',
+  '2:30',
+  '3:00',
+  '3:30',
+  '4:00',
+  '4:30',
+  '5:00',
+  '5:30',
+  '6:00',
+  '6:30',
+  '7:00',
+  '7:30',
+  '8:00',
+  '8:30',
+  '9:00',
+  '9:30',
+  '10:00',
+  '10:30',
+  '11:00',
+  '11:30',
+  '12:00',
+  '12:30',
+  '13:00',
+  '13:30',
+  '14:00',
+  '14:30',
+  '15:00',
+  '15:30',
+  '16:00',
+  '16:30',
+  '17:00',
+  '17:30',
+  '18:00',
+  '18:30',
+  '19:00',
+  '19:30',
+  '20:00',
+  '20:30',
+  '21:00',
+  '21:30',
+  '22:00',
+  '22:30',
+  '23:00',
+  '23:30',
+];
+
+export const DISABLE_DATES_TIME_SLOTS = [
+  '0:00',
+  '1:00',
+  '2:00',
+  '3:00',
+  '4:00',
+  '5:00',
+  '6:00',
+  '7:00',
+  '8:00',
+  '9:00',
+  '10:00',
+  '11:00',
+  '12:00',
+  '13:00',
+  '14:00',
+  '15:00',
+  '16:00',
+  '17:00',
+  '18:00',
+  '19:00',
+  '20:00',
+  '21:00',
+  '22:00',
+  '23:00',
+];
