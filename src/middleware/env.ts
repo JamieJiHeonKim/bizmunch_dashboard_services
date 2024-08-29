@@ -3,16 +3,16 @@ import fs from 'fs';
 import { Logger } from './log4';
 Logger.initialize();
 
-// if (fs.existsSync('.env')) {
-//   dotenv.config({ path: '.env' });
-// }
+if (fs.existsSync('.env')) {
+  dotenv.config({ path: '.env' });
+}
 
 const ENVIRONMENT = process.env.NODE_ENV;
 export const IS_PRODUCTION = ENVIRONMENT === 'production';
 
 if (!process.env.SESSION_SECRET) {
   Logger.warn('SESSION_SECRET IS UNDEFINED AT ENV FILE');
-  // process.exit(1);
+  process.exit(1);
 }
 
 
@@ -21,7 +21,7 @@ if (!process.env.SESSION_SECRET) {
 
 if (!process.env.JWT_SECRET) {
   Logger.warn('JWT_SECRET IS UNDEFINED AT ENV FILE');
-  // process.exit(1);
+  process.exit(1);
 }
 
 
