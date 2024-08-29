@@ -9,6 +9,8 @@ Logger.initialize();
 
 const ENVIRONMENT = process.env.NODE_ENV;
 export const IS_PRODUCTION = ENVIRONMENT === 'production';
+console.log('env.ts starting');
+console.log('IS_PRODUCTION:', IS_PRODUCTION);
 
 if (!process.env.SESSION_SECRET) {
   Logger.warn('SESSION_SECRET IS UNDEFINED AT ENV FILE');
