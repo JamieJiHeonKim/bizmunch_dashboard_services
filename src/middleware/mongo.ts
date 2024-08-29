@@ -4,6 +4,7 @@ import { GridFSBucket, ObjectId, GridFSBucketReadStream } from 'mongodb';
 import { MONGO_DB_CONNECTION_STRING, IS_PRODUCTION } from "./env";
 // import { Logger } from ‘./log4’;
 mongoose.Promise = bluebird;
+mongoose.set('strictQuery', true);
 export const mongoUri = `${process.env.DB_PROTOCOL}://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_HOST}/?retryWrites=true&w=majority&appName=${process.env.DB_NAME}`;
 
 interface GridFSFile {
