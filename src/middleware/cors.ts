@@ -2,9 +2,9 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 
 const whitelist = [
-
   'http://localhost:8081',
- 
+  'https://bizmunch.com',
+  'https://api.bizmunch.com'
 ];
 
 export const corsOptions = {
