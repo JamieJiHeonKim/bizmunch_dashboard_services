@@ -4,8 +4,8 @@ exports.sessionConfig = void 0;
 const env_1 = require("./env");
 exports.sessionConfig = {
     secret: env_1.SESSION_SECRET,
-    resave: true,
-    saveUninitialized: false,
+    resave: false,
+    saveUninitialized: true,
     cookie: {
         sameSite: env_1.IS_PRODUCTION ? 'none' : 'lax',
         secure: env_1.IS_PRODUCTION,

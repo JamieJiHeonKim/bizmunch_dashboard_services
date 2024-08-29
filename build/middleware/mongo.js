@@ -15,16 +15,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getImageFromGridFS = exports.saveImageToGridFS = exports.connectMongo = exports.mongoUri = void 0;
 const bluebird_1 = __importDefault(require("bluebird"));
 const mongoose_1 = __importDefault(require("mongoose"));
+const env_1 = require("./env");
 // import { Logger } from ‘./log4’;
 mongoose_1.default.Promise = bluebird_1.default;
 exports.mongoUri = `${process.env.DB_PROTOCOL}://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_HOST}/?retryWrites=true&w=majority&appName=${process.env.DB_NAME}`;
 const config = {
+    ssl: env_1.IS_PRODUCTION,
+    dbName: process.env.DB_NAME,
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000
     // user: process.env.DB_USER,
     // pass: process.env.DB_PASS,
     // dbName: process.env.DB_NAME,
-    ssl: true,
+    // ssl: true,
 };
 let gfs;
 const connectMongo = () => __awaiter(void 0, void 0, void 0, function* () {

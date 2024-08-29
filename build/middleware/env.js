@@ -13,6 +13,8 @@ if (fs_1.default.existsSync('.env')) {
 }
 const ENVIRONMENT = process.env.NODE_ENV;
 exports.IS_PRODUCTION = ENVIRONMENT === 'production';
+console.log('env.ts starting');
+console.log('IS_PRODUCTION:', exports.IS_PRODUCTION);
 if (!process.env.SESSION_SECRET) {
     log4_1.Logger.warn('SESSION_SECRET IS UNDEFINED AT ENV FILE');
     process.exit(1);
