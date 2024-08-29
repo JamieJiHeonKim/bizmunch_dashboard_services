@@ -3,18 +3,18 @@ import { MONGO_DB_CONNECTION_STRING, IS_PRODUCTION, SESSION_SECRET } from './env
 import MongoStore from 'connect-mongo';
 
 export const mongoUri = `${process.env.DB_PROTOCOL}://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_HOST}/?retryWrites=true&w=majority&appName=${process.env.DB_NAME}`;
-
+console.log("mongoUri:", mongoUri);
 if (!mongoUri) {
   throw new Error("MONGO_DB_CONNECTION_STRING is not defined in the environment variables.");
 }
 
 export const sessionConfig: SessionOptions = {
-  secret: process.env.SESSION_SECRET,
+  secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    sameSite: process.env.IS_PRODUCTION ? 'none' : 'lax',
-    secure: process.env.IS_PRODUCTION,
+    sameSite: IS_PRODUCTION ? 'none' : 'lax',
+    secure: IS_PRODUCTION,
     domain: (() => {
       const host = typeof window !== 'undefined' ? window.location.hostname : '';
       if (host.includes('bizmunch.com')) {
