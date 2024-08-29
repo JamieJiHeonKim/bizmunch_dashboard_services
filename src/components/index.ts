@@ -12,8 +12,8 @@ const apiLimiter = rateLimit({
 });
 
 export const registerComponents = (app: express.Application) => {
-  if (process.env.NODE_ENV === 'development') app.use('/v1', components);
-  else app.use('/v1',apiLimiter, components);
+  if (process.env.NODE_ENV === 'development') app.use('/', components);
+  else app.use('/',apiLimiter, components);
 
   
   app.get('/', (req, res, next) => {
