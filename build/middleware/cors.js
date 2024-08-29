@@ -5,6 +5,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.corsOptions = void 0;
 const whitelist = [
     'http://localhost:8081',
+    'https://bizmunch.com',
+    'https://api.bizmunch.com'
 ];
 exports.corsOptions = {
     origin(origin, callback) {
