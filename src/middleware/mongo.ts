@@ -4,9 +4,7 @@ import { GridFSBucket, ObjectId, GridFSBucketReadStream } from 'mongodb';
 import { MONGO_DB_CONNECTION_STRING, IS_PRODUCTION } from "./env";
 // import { Logger } from ‘./log4’;
 mongoose.Promise = bluebird;
- export const mongoUri = `${process.env.DB_PROTOCOL}://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_HOST}/?retryWrites=true&w=majority&appName=${process.env.DB_NAME}`;
-//  export const mongoUri = `mongodb+srv://as1265513:uYFi7i3POqYub4hF@medchain.tpnqlhe.mongodb.net/bikesns?retryWrites=true&w=majority`
-// const mongoUri = `${MONGO_DB_CONNECTION_STRING}?retryWrites=true&w=majority;`;
+export const mongoUri = `${process.env.DB_PROTOCOL}://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_HOST}/?retryWrites=true&w=majority&appName=${process.env.DB_NAME}`;
 
 interface GridFSFile {
   _id: ObjectId;
@@ -19,12 +17,15 @@ interface GridFSFile {
 }
 
 const config = {
+  ssl: IS_PRODUCTION,
+  dbName: process.env.DB_NAME,
   useNewUrlParser: true,
   useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000
   // user: process.env.DB_USER,
   // pass: process.env.DB_PASS,
   // dbName: process.env.DB_NAME,
-  ssl: true,
+  // ssl: true,
 };
 
 let gfs: GridFSBucket;
