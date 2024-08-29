@@ -20,6 +20,7 @@ export const register = async (req: Request,res: Response,next: NextFunction) =>
 };
 
 export const login = async ( req: Request, res: Response,next: NextFunction) => {
+  console.log('login triggered');
   try {
     Logger.info(req.body);
     const user = req.user as dashboardUserDocument;
