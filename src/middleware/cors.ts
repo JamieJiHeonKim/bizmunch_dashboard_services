@@ -3,6 +3,8 @@
 
 const whitelist = [
   'http://localhost:8081',
+  'http://localhost:3001',
+  'http://localhost:3000',
   'https://bizmunch.com',
   'https://api.bizmunch.com'
 ];
