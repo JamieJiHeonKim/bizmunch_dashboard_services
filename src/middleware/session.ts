@@ -16,6 +16,7 @@ export const sessionConfig: SessionOptions = {
       sameSite: IS_PRODUCTION ? 'none' : 'lax',
       secure: IS_PRODUCTION,
       domain: '.bizmunch.com',
+      // domain: 'localhost',
       maxAge: 30 * 60 * 60 * 1000, // 30 days
   },
   store: MongoStore.create({

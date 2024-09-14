@@ -23,7 +23,18 @@ const upload = multer({
       cb(null, false);
     }
   },
-}).fields([{ name: 'logo', maxCount: 1 }, { name: 'barcode', maxCount: 1 }]);
+}).fields([{ name: 'logo', maxCount: 1 }]);
+
+const uploadBarcode = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(null, false);
+    }
+  },
+}).fields([{ name: 'barcode', maxCount: 1 }]);
 
 // const uploadMenu = multer({
 //   storage: multer.memoryStorage(),
@@ -50,7 +61,7 @@ router.get('/restaurant/:id/details', controller.getRestaurantDetails);
 // create a company
 router.post('/companies', authUser, controller.createCompany);
 router.post('/restaurants', authUser, upload, controller.createRestaurant as any);
-router.post('/menu/:restaurantId', authUser, controller.createMenu);
+router.post('/menu/:restaurantId', authUser, uploadBarcode, controller.createMenu as any);
 
 // Get individual company
 router.get('/companies/:id',authUser, controller.getCompany);

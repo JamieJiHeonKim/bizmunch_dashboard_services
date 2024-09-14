@@ -25,7 +25,7 @@ interface MenuItem {
   name: string;
   price: string;
   calories: string;
-  ingredients: string;
+  description: string;
 }
 
 export const getRestaurantDetails = async (req: Request, res: Response, next: NextFunction) => {
@@ -92,7 +92,6 @@ export const getCompanyNames = async (req: Request, res: Response, next: NextFun
 export const getRestaurantNames = async (req: Request, res: Response, next: NextFunction) => {
   try {
 
-    // Step 1: Fetch all restaurants
     const restaurants = await RESTAURANT.find();
 
     res.status(200).json(restaurants);
@@ -191,23 +190,20 @@ export const createCompany = async (req: Request, res: Response, next: NextFunct
 export const createRestaurant = async (req: MulterReq, res: Response, next: NextFunction) => {
   console.log("show me req.files:", req.files);
 
-  if (!req.files || !req.files.logo || !req.files.barcode) {
-    return res.status(400).json({ message: "Both logo and barcode files are required." });
+  if (!req.files || !req.files.logo) {
+    return res.status(400).json({ message: "Logo file is required." });
   }
 
   const { name, location, managerName, managerEmail, category } = req.body;
 
-  let logoId, barcodeId;
+  let logoId;
 
   try {
     if (req.files.logo) {
       logoId = await saveImageToGridFS(req.files.logo[0].buffer, req.files.logo[0].originalname, req.files.logo[0].mimetype);
     }
-    if (req.files.barcode) {
-      barcodeId = await saveImageToGridFS(req.files.barcode[0].buffer, req.files.barcode[0].originalname, req.files.barcode[0].mimetype);
-    }
 
-    if (!logoId || !barcodeId) {
+    if (!logoId) {
       throw new Error("Failed to save images");
     }
 
@@ -217,8 +213,7 @@ export const createRestaurant = async (req: MulterReq, res: Response, next: Next
       managerName,
       managerEmail,
       category,
-      logo: logoId,
-      barcode: barcodeId
+      logo: logoId
     });
 
     const newRestaurant = await restaurant.save();
@@ -301,14 +296,10 @@ export const editRestaurant = async (req: MulterReq, res: Response, next: NextFu
     const { id } = req.params;
     const { name, location, managerName, managerEmail, category } = req.body;
 
-    let logoId: string | undefined, barcodeId: string | undefined;
+    let logoId: string | undefined;
     if (req.files?.logo) {
       const logoFile = req.files.logo[0];
       logoId = await saveImageToGridFS(logoFile.buffer, logoFile.originalname, logoFile.mimetype);
-    }
-    if (req.files?.barcode) {
-      const barcodeFile = req.files.barcode[0];
-      barcodeId = await saveImageToGridFS(barcodeFile.buffer, barcodeFile.originalname, barcodeFile.mimetype);
     }
     const updateData = {
       name,
@@ -316,8 +307,7 @@ export const editRestaurant = async (req: MulterReq, res: Response, next: NextFu
       managerName,
       managerEmail,
       category,
-      ...(logoId && { logo: logoId }),
-      ...(barcodeId && { barcode: barcodeId }),
+      ...(logoId && { logo: logoId })
     };
 
     const updatedRestaurant = await Restaurant.findByIdAndUpdate(id, updateData, { new: true });
@@ -369,18 +359,27 @@ export const deleteRestaurant = async (req: Request, res: Response, next: NextFu
   }
 };
 
-export const createMenu = async (req: Request, res: Response, next: NextFunction) => {
+export const createMenu = async (req: MulterReq, res: Response, next: NextFunction) => {
+  console.log("show me req.files:", req.files);
   try {
-    const { restaurantId, restaurantName, type, name, price, calories, ingredients } = req.body;
+    const { restaurantId, restaurantName, type, name, price, calories, description, discount } = req.body;
 
-    if (!type || !name || !price || !calories || !restaurantName) {
-        return res.status(400).json({ message: "Menu type, item name, price, calories, and restaurant name are required." });
+    let barcodeId;
+
+    if (discount === 'true') {
+      if (!req.files || !req.files.barcode) {
+        return res.status(400).json({ message: "Barcode file is required when discount is true." });
+      }
+
+      barcodeId = await saveImageToGridFS(req.files.barcode[0].buffer, req.files.barcode[0].originalname, req.files.barcode[0].mimetype);
     }
 
     const newItem = {
       price,
       calories,
-      ingredients: ingredients.split(',').map((ingredient: string) => ingredient.trim()),
+      description,
+      discount: discount === 'true',
+      barcode: barcodeId || null,
     };
 
     let menu = await Menu.findOne({ restaurantId });
@@ -393,32 +392,19 @@ export const createMenu = async (req: Request, res: Response, next: NextFunction
       });
 
       const savedMenu = await newMenu.save();
-      console.log("New menu created and saved:", savedMenu);
       return res.status(201).json({ message: "Menu created successfully.", menu: savedMenu });
     } else {
-      // Ensure the menu type exists
       if (!menu.menu[type]) {
         menu.menu[type] = {};
       }
 
-      console.log("Existing menu before adding new item:", JSON.stringify(menu.menu, null, 2));
-
-      // Add or update the specific item in the menu
       menu.menu[type][name] = newItem;
 
-      // Another debugging log to ensure the item is added
-      console.log("Updated menu with new item added:", JSON.stringify(menu.menu, null, 2));
-
-      // Force the update using updateOne
-      const result = await Menu.updateOne(
+      const updatedMenu = await Menu.updateOne(
         { restaurantId },
         { $set: { [`menu.${type}`]: menu.menu[type] } }
       );
 
-      console.log("Result of the update operation:", result);
-
-      // Re-fetch the updated menu to confirm the changes
-      const updatedMenu = await Menu.findOne({ restaurantId });
       return res.status(200).json({ message: "Menu item added successfully.", menu: updatedMenu });
     }
   } catch (err) {
@@ -549,7 +535,7 @@ export const searchUsers = async (req: Request, res: Response, next: NextFunctio
 // Create a new user
 export const createManager = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = req?.user as dashboardUserDocument; // Assuming you have a middleware to populate req.user with the user document
+    const user = req?.user as dashboardUserDocument;
     if (user.status !== 'admin') {
     return res.status(403).json({ message: 'Only admin users can access this endpoint' });
     }

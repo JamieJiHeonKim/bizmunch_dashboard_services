@@ -11,7 +11,6 @@ const restaurantSchema = new Schema(
     managerEmail: { type: String, required: true, unique: true },
     category: { type: String, required: true },
     logo: { type: String , required: true },
-    barcode: { type: String, required: true },
     menuId: {type: Schema.Types.ObjectId, ref: 'Menu'},
   },
   { timestamps: true },

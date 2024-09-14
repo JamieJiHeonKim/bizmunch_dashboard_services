@@ -1,9 +1,12 @@
 import { Schema, model } from 'mongoose';
 
 const menuItemSchema = new Schema({
+  name: { type: String, required: true },
   price: { type: String, required: true },
-  calories: { type: String, required: true },
-  ingredients: { type: [String], required: true },
+  calories: { type: String },
+  description: { type: String },
+  barcode: { type: String, required: false },
+  discount: { type: Boolean, default: false, required: true }
 });
 
 const menuSchema = new Schema({
