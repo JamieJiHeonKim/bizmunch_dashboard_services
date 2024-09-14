@@ -47,7 +47,6 @@ export type restaurantDocument = mongoose.Document & {
   managerEmail: string;
   category: string;
   logo: string;
-  barcode: string;
   menuId: mongoose.Schema.Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
@@ -60,8 +59,9 @@ export type menuDocument = mongoose.Document & {
     name: string;
     price: string;
     calories?: string;
-    ingredients?: string;
-    image?: string;
+    description?: string;
+    barcode: string;
+    discount: boolean;
   }>;
   createdAt?: Date;
   updatedAt?: Date;
@@ -89,4 +89,3 @@ export type transactionDocument = mongoose.Document & {
   updatedAt?: Date;
   deletedAt?: Date;
 };
-
