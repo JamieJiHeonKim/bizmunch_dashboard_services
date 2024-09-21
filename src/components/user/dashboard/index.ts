@@ -34,7 +34,7 @@ const uploadBarcode = multer({
       cb(null, false);
     }
   },
-}).fields([{ name: 'barcode', maxCount: 1 }]);
+}).fields([{ name: 'barcode', maxCount: 1 }, { name: 'image', maxCount: 1 }]);
 
 // const uploadMenu = multer({
 //   storage: multer.memoryStorage(),

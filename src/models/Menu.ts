@@ -6,7 +6,8 @@ const menuItemSchema = new Schema({
   calories: { type: String },
   description: { type: String },
   barcode: { type: String, required: false },
-  discount: { type: Boolean, default: false, required: true }
+  discount: { type: Boolean, default: false, required: true },
+  image: { type: String, required: false }
 });
 
 const menuSchema = new Schema({
