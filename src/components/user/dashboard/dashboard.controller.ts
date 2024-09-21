@@ -365,6 +365,7 @@ export const createMenu = async (req: MulterReq, res: Response, next: NextFuncti
     const { restaurantId, restaurantName, type, name, price, calories, description, discount } = req.body;
 
     let barcodeId;
+    let imageId;
 
     if (discount === 'true') {
       if (!req.files || !req.files.barcode) {
@@ -374,12 +375,17 @@ export const createMenu = async (req: MulterReq, res: Response, next: NextFuncti
       barcodeId = await saveImageToGridFS(req.files.barcode[0].buffer, req.files.barcode[0].originalname, req.files.barcode[0].mimetype);
     }
 
+    if (req.files?.image) {
+      imageId = await saveImageToGridFS(req.files.image[0].buffer, req.files.image[0].originalname, req.files.image[0].mimetype);
+    }
+
     const newItem = {
       price,
       calories,
       description,
       discount: discount === 'true',
       barcode: barcodeId || null,
+      image: imageId || null
     };
 
     let menu = await Menu.findOne({ restaurantId });

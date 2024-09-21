@@ -62,6 +62,7 @@ export type menuDocument = mongoose.Document & {
     description?: string;
     barcode: string;
     discount: boolean;
+    image: string;
   }>;
   createdAt?: Date;
   updatedAt?: Date;
