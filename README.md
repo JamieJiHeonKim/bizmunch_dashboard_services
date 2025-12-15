@@ -1,434 +1,487 @@
 # Biz MuncH Dashboard Backend Services
 
-A TypeScript-based RESTful API powering the management dashboard and mobile app for the Biz MuncH restaurant discount platform. This service acts as the central system connecting admins, restaurant managers, and mobile app users through a unified MongoDB database.
+A TypeScript-based RESTful API powering the management dashboard and mobile app for the Biz MuncH restaurant discount platform. This service acts as the data layer connecting admins, restaurant managers, and mobile app users through a unified MongoDB database with real-time synchronization.
 
-## Overview
+**BizMuncH URL:** [bizmunch.com](https://bizmunch.com/home)
 
-Biz MuncH is a mobile application that delivers weekly rotating restaurant discounts to users. Every Monday at midnight, users receive 10 new restaurant selections with exclusive offers. This backend API is what makes the entire ecosystem work - it handles authentication, manages restaurant data, processes transactions, uploads menu photos to GridFS, and ensures that every change made in the admin dashboard appears instantly in the mobile app.
+**Frontend Dashboard Repository:** [bizmunch-dashboard-site](https://github.com/JamieJiHeonKim/bizmunch_dashboard_site)
 
-**The problem this solves:** Restaurant partners need a robust API to handle real-time data updates, admins need secure role-based access control, and the mobile app needs fast, reliable data fetching. This backend bridges all three with a scalable Node.js architecture.
+### Application Workflow
+
+1. **User Authentication**
+   - Admin/Manager/Employee hits `/users/auth/login` with email and password
+   - Backend validates credentials with bcrypt password comparison
+   - JWT token generated and returned with user object
+   - Token stored in frontend (Redux + sessionStorage)
+
+2. **Admin Creates a Company**
+   - Dashboard sends `POST /users/dashboard/companies` with company details
+   - Backend validates request with express-validator
+   - Mongoose saves document to MongoDB companies collection
+   - Returns company object with generated `_id`
+   - Mobile app queries same collection → instant sync
+
+3. **Admin Uploads Restaurant Logo**
+   - Dashboard sends multipart/form-data with logo file
+   - Multer middleware parses file upload
+   - Backend streams file to GridFS (MongoDB file storage)
+   - Returns GridFS file ID
+   - Restaurant document saves reference: `logo: "60d5ec49f1b2c8b1f8e4e1a1"`
+
+4. **Manager Records Transaction**
+   - Dashboard sends `POST /users/dashboard/transactions` with sale data
+   - Middleware verifies JWT token and checks role (manager only)
+   - Transaction saved with `companyId` from authenticated user
+   - Aggregation pipeline recalculates popular products
+   - Analytics dashboard updates in real-time
+
+5. **Mobile App Fetches Restaurant Menu**
+   - Mobile app sends `GET /users/dashboard/restaurant/:id/details`
+   - Backend queries restaurants collection and joins menu collection
+   - Returns nested menu object with image URLs from GridFS
+   - Mobile app displays menu with photos and discount barcodes
+
+---
+
+## Technologies Used
+
+### Backend Stack
+- **Node.js 18** - Async runtime with JavaScript engine
+- **TypeScript** - Type safety and compile-time error checking
+- **Express.js** - Lightweight HTTP framework with middleware ecosystem
+- **Mongoose** - MongoDB ODM with schema validation
+- **MongoDB** - Document database with nested data structures
+- **GridFS** - MongoDB's file storage system for binary data
+
+### Authentication & Security
+- **JWT (jsonwebtoken)** - Stateless token-based authentication
+- **Bcrypt** - Password hashing with salt rounds
+- **Passport.js** - Authentication middleware (partially implemented)
+- **Express-session** - Session management for development
+- **Connect-mongo** - MongoDB session store
+
+### File Upload & Processing
+- **Multer** - Multipart/form-data parser for file uploads
+- **GridFSBucket** - MongoDB streaming API for large files
+- **UUID** - Unique identifier generation
+
+### Validation & Error Handling
+- **Express-validator** - Request validation with sanitization
+- **Custom Error Classes** - Structured error handling with HTTP status codes
+
+### Logging & Monitoring
+- **Log4js** - Structured logging with file rotation
+- **Debug** - Development logging utility
+
+### API Documentation
+- **Swagger UI Express** - Interactive API documentation
+- **Swagger JSDoc** - Generate OpenAPI specs from JSDoc comments
+
+### Internationalization
+- **i18n** - Multi-language support (English/Japanese)
+- **i18next** - Translation framework with middleware
+
+### Deployment & DevOps
+- **Docker** - Multi-stage containerized builds
+- **AWS CodeDeploy** - CI/CD with automated deployment scripts
+- **PM2** - Process manager for production (optional)
+
+### Development Tools
+- **Nodemon** - Auto-reload during development
+- **ts-node** - Run TypeScript directly without compilation
+- **Rimraf** - Cross-platform directory cleanup
+
+---
 
 ## System Architecture
 
-### The Big Picture
+### Design Rationale
+
+This architecture was built to support **role-based access control**, **real-time data synchronization**, and **horizontal scalability** for a multi-tenant restaurant discount platform.
+
+**Key Design Decisions:**
+
+1. **REST API with JWT Authentication**
+   - **Why:** Stateless auth scales horizontally; no session store bottleneck; mobile app and dashboard use same auth mechanism
+   - **Usage:** User logs in → JWT issued → Token included in every subsequent request → Middleware verifies token → Attaches user object to `req.user`
+
+2. **MongoDB with GridFS for File Storage**
+   - **Why:** Document-oriented schema fits nested menu structures; GridFS keeps images and data in same database; no separate S3 setup
+   - **Usage:** Admin uploads restaurant logo → Multer receives file → GridFS streams to MongoDB → Returns file ID → Restaurant document stores reference
+
+3. **Component-Based Architecture**
+   - **Why:** Feature isolation (auth vs. dashboard); easier to test and maintain; clear separation of concerns
+   - **Usage:** Each feature has its own controller, service, validation, and docs; easy to add new features by creating new component folder
+
+4. **Role-Based Middleware (Admin/Manager/Employee)**
+   - **Why:** Different user types need different permissions; middleware enforces access control before reaching controllers
+   - **Usage:** Protected routes wrapped with `authAdmin` or `authUser` middleware → Verifies JWT → Checks role → Allows/denies access
+
+5. **Centralized Error Handling**
+   - **Why:** Consistent error responses; prevents sensitive error details from leaking; logs all errors in one place
+   - **Usage:** Controllers call `next(err)` → Error handler middleware formats response → Logs error → Returns structured JSON
+
+6. **GridFS for Binary File Storage**
+   - **Why:** Transactional consistency (delete restaurant → delete associated images); simpler deployment (no S3 configuration); keeps all data in MongoDB
+   - **Usage:** Images served via streaming endpoint `/images/:imageId` → GridFS streams file → No memory buffering for large files
+
+**Real-World Usage:**
+- Admin creates restaurant → Uploads logo to GridFS → Adds 10 menu items with photos → Sets discount barcodes → Mobile app queries MongoDB → Users see new restaurant immediately → Manager logs in → Records transactions → Analytics aggregation pipeline runs → Dashboard shows profit charts
+
+### High-Level Design
 
 ```
-Admin Dashboard (React) ⟷ REST API (Express + TypeScript) ⟷ MongoDB ⟷ Mobile App (React Native)
-                                        ⬆
-                                    GridFS (Image Storage)
+┌─────────────────────────────────────────────────────────────┐
+│                        Client Layer                         │
+│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐     │
+│  │  Admin Web   │   │ Manager Web  │   │  Mobile App  │     │
+│  │  Dashboard   │   │  Dashboard   │   │  (React      │     │
+│  │   (React)    │   │   (React)    │   │  Native)     │     │
+│  └──────┬───────┘   └──────┬───────┘   └──────┬───────┘     │
+│         │                  │                  │             │
+│         └──────────────────┼──────────────────┘             │
+│                            │                                │
+└────────────────────────────┼────────────────────────────────┘
+                             │ HTTPS REST API
+                             │ Authorization: Bearer <JWT>
+┌────────────────────────────┼────────────────────────────────┐
+│                  Express.js API Server                      │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │               Middleware Layer                     │     │
+│  │  • CORS         • Body Parser   • Cookie Parser    │     │
+│  │  • Log4js       • Sessions      • Error Handler    │     │
+│  └────────────────────────┬───────────────────────────┘     │
+│  ┌────────────────────────┴───────────────────────────┐     │
+│  │             Auth Middleware                        │     │
+│  │  • JWT Verification  • Role Validation             │     │
+│  └────────────────────────┬───────────────────────────┘     │
+│  ┌────────────────────────┴───────────────────────────┐     │
+│  │             Route Layer (Components)               │     │
+│  │  • /users/auth        → Authentication             │     │
+│  │  • /users/dashboard   → CRUD Operations            │     │
+│  └────────────────────────┬───────────────────────────┘     │
+│  ┌────────────────────────┴───────────────────────────┐     │
+│  │           Controller → Service → Model             │     │
+│  │  • Request Handling  • Business Logic              │     │
+│  │  • Validation        • DB Queries                  │     │
+│  └────────────────────────┬───────────────────────────┘     │
+└───────────────────────────┼─────────────────────────────────┘
+                            │ Mongoose ODM
+                   ┌────────▼────────┐
+                   │    MongoDB      │
+                   │    Database     │
+                   │                 │
+                   │ Collections:    │
+                   │ • dashboard.    │
+                   │   users         │
+                   │ • companies     │
+                   │ • restaurants   │
+                   │ • menus         │
+                   │ • transactions  │
+                   │ • notifications │
+                   │                 │
+                   │ GridFS Buckets: │
+                   │ • uploads.files │
+                   │ • uploads.chunks│
+                   └─────────────────┘
 ```
 
-This API is the **data layer and business logic hub** for the entire Biz MuncH ecosystem:
-- **Frontend**: React dashboard (separate repo) makes authenticated HTTP requests to this API
-- **Backend**: TypeScript + Express RESTful API with JWT authentication
-- **Database**: MongoDB with GridFS for binary file storage (restaurant logos, menu photos, QR codes)
-- **Mobile App**: React Native app (separate repo) reads from the same MongoDB instance
-- **Deployment**: Dockerized with AWS CodeDeploy for CI/CD
-
-All CRUD operations flow through this API. When an admin uploads a restaurant logo or a manager creates a transaction, this service validates the request, transforms the data, and writes to MongoDB. The mobile app immediately reflects these changes because it queries the same database.
-
-### Role-Based Access Control
-
-The API enforces three distinct user roles with permission-based middleware:
-
-**Admin Role:** (So far only Admin Role  is fully working)
-- Full CRUD access to companies (restaurant groups)
-- Manage all restaurants and their menus
-- Create manager accounts and assign them to companies
-- Upload images to GridFS (logos, menu photos, discount barcodes)
-- View all users and transactions across the platform
-- Send platform-wide or company-specific notifications
-
-**Manager Role:** (Not yet completed)
-- View dashboard analytics for their assigned company
-- Create and manage employee accounts within their company
-- Record transactions when discounts are redeemed in-store
-- Access popular product statistics and transaction history
-- Receive notifications from admins
-
-**Employee Role:** (Not yet started)
-- View personal dashboard and account settings
-- Update profile information and change password
-- Access company-specific notifications
-
-Middleware functions (`authAdmin`, `authUser`) verify JWT tokens and check user roles before allowing access to protected endpoints.
-
-## Tech Stack & Why I Chose Each
-
-### Runtime & Language
-**Node.js 18 with TypeScript** as the foundation. I went with TypeScript because:
-- Type safety caught bugs during development that would've been runtime errors in vanilla JS
-- Better IDE autocomplete when working with Mongoose models and Express request/response types
-- Enforced consistent data shapes across controllers, services, and models
-
-**Why Node.js?** The dashboard and mobile app are both JavaScript-based (React/React Native), so using Node.js for the backend meant sharing validation logic, using the same date libraries (dayjs), and thinking in the same async/await patterns across the stack.
-
-### Web Framework
-**Express.js** for the HTTP server:
-- Lightweight and flexible
-- Massive ecosystem of middleware (cors, cookie-parser, multer, express-validator)
-- Easy to structure as component-based modules (auth component, dashboard component)
-- Simple route mounting with `app.use('/users', userRoutes)`
-
-### Database & ODM
-**MongoDB with Mongoose** for data persistence:
-- Flexible schema design - could iterate on models without migrations as requirements changed
-- GridFS for storing binary files (images, QR codes) directly in MongoDB
-- Mongoose for schema validation, middleware hooks (password hashing on save), and TypeScript integration
-- Native support for aggregation pipelines (used for popular product queries)
-
-**Why MongoDB over SQL?** The data model is document-oriented (restaurants have nested menu items, users belong to companies). MongoDB's nested documents and arrays fit naturally. Plus, both the dashboard and mobile app query the same database, and MongoDB's flexibility made it easy to add fields like `discount` or `barcode` to menu items without schema migrations.
-
-**GridFS Integration**: Instead of using AWS S3 for images, I implemented GridFS (MongoDB's file storage system):
-- Keeps all data in one place (no separate storage service to manage)
-- Handles file streaming efficiently for serving images via Express routes
-- Transactional consistency - if a restaurant is deleted, GridFS cleanup happens in the same database operation
-- Simpler deployment (no S3 bucket configuration needed)
-
-### Authentication & Security
-**JWT (JSON Web Tokens) with Passport.js**:
-- Stateless authentication
-- JWT payload contains user ID, email, and role for permission checks
-- Tokens issued on login and verified by middleware on protected routes
-- Used `express-session` with `connect-mongo` for session persistence during development
-
-**Bcrypt for password hashing**:
-- Passwords salted and hashed before storing in MongoDB
-- Mongoose pre-save hook automatically hashes passwords on user creation
-- `comparePassword` method on user model for login validation
-
-**Why JWT over sessions?** The mobile app needs to authenticate too, and sending a token with each request is simpler than managing session cookies across web and mobile clients. JWTs also make horizontal scaling easier since there's no shared session store.
-
-### Input Validation
-**Express-validator** for request validation:
-- Declarative validation rules in separate validation files (`auth.validation.ts`, `dashboard.validation.ts`)
-- Sanitizes inputs to prevent injection attacks
-- Returns structured error messages to the frontend
-- Example: Email format validation, password strength checks, required field enforcement
-
-**Type-safe validation**: Used custom TypeScript types (`@types/validation.d.ts`) to ensure validators and controllers agree on expected request shapes.
-
-### Image Upload & Processing
-**Multer** for handling multipart/form-data:
-- Parses file uploads from the dashboard's FormData submissions
-- Stores files in memory buffers before writing to GridFS
-- Handles multiple file fields (logo, barcode, menu images)
-- File type filtering to prevent non-image uploads
-
-**GridFS streaming**: Custom utility functions (`saveImageToGridFS`, `getImageFromGridFS`) wrap MongoDB's GridFSBucket API for cleaner controller code.
-
-### API Documentation
-**Swagger UI with swagger-jsdoc**:
-- Auto-generated API documentation from JSDoc comments in route files
-- Interactive UI at `/api-docs` for testing endpoints without Postman
-- Documents request/response schemas, authentication requirements, and error codes
-- Kept docs in sync with code by generating them from source
-
-### Error Handling
-**Centralized error handler middleware**:
-- Custom `ApiErrorStructure` class for consistent error responses
-- Error handler middleware catches all thrown errors and formats them
-- HTTP status codes mapped to error types (400 for validation, 401 for auth, 500 for server errors)
-- Prevents sensitive error details from leaking to clients in production
-
-### Deployment & DevOps
-**Docker** for containerization:
-- Multi-stage Dockerfile: `npm install` → `npm run build` → run compiled JS
-- Alpine Linux base image (node:18-alpine) for smaller container size
-- Exposed on port 3001
-- Environment variables passed at runtime for DB connection strings
-
-**Why Docker?** Ensures the app runs identically on my laptop, staging, and production. No "works on my machine" issues. Docker Compose could orchestrate MongoDB locally, and the same image deploys to AWS.
-
-## Project Structure
+### Backend Architecture
 
 ```
 src/
-├── index.ts                       # Express app initialization and server start
-├── components/                    # Feature-based component modules
+├── index.ts                       # Express app initialization
+├── bin/
+│   └── www.ts                     # HTTP server creation
+│
+├── components/                    # Feature-based modules
+│   ├── components.ts              # Route aggregator
 │   ├── user/
-│   │   ├── auth/                  # Authentication endpoints (login, register, password change)
-│   │   │   ├── auth.controller.ts # Route handlers for auth
-│   │   │   ├── auth.service.ts    # Business logic (token generation, password hashing)
-│   │   │   ├── auth.validation.ts # Express-validator rules for auth requests
-│   │   │   └── auth.docs.ts       # Swagger documentation for auth endpoints
-│   │   ├── dashboard/             # Dashboard CRUD operations
-│   │   │   ├── dashboard.controller.ts # Companies, restaurants, menus, users, notifications
-│   │   │   ├── dashboard.service.ts    # Business logic for dashboard operations
-│   │   │   └── dashboard.validation.ts # Validation rules for dashboard requests
-│   └── utils/                     # Utility functions and helpers
-│       ├── apiErrorHandler.ts     # Custom error classes and error handling utilities
-│       ├── jwt.ts                 # JWT token generation and verification
-│       ├── passport.ts            # Passport.js strategies (not fully implemented)
-│       └── validation.ts          # Reusable validation helpers
+│   │   ├── auth/                  # Authentication feature
+│   │   │   ├── auth.controller.ts # Route handlers
+│   │   │   ├── auth.service.ts    # Business logic
+│   │   │   ├── auth.validation.ts # Input validation
+│   │   │   ├── auth.message.ts    # Response messages
+│   │   │   ├── auth.docs.ts       # Swagger documentation
+│   │   │   └── index.ts           # Route definitions
+│   │   │
+│   │   └── dashboard/             # Dashboard CRUD feature
+│   │       ├── dashboard.controller.ts
+│   │       ├── dashboard.service.ts
+│   │       ├── dashboard.validation.ts
+│   │       ├── dashboard.message.ts
+│   │       ├── dashboard.docs.ts
+│   │       └── index.ts
+│   │
+│   └── utils/                     # Shared utilities
+│       ├── apiErrorHandler.ts     # Custom error classes
+│       ├── ApiErrorStructure.ts   # Error formatting
+│       ├── Authenticate.ts        # Token generation
+│       ├── jwt.ts                 # JWT utilities
+│       ├── passport.ts            # Passport strategies
+│       ├── validation.ts          # Validation helpers
+│       ├── s3.ts                  # AWS S3 utilities
+│       └── ...
+│
 ├── middleware/                    # Express middleware
-│   ├── authAdmin.ts               # Verify JWT and check for admin role
-│   ├── authUser.ts                # Verify JWT for any authenticated user
-│   ├── config.ts                  # Express app configuration (CORS, body-parser, sessions)
-│   ├── cors.ts                    # CORS configuration for dashboard and mobile app
-│   ├── mongo.ts                   # MongoDB connection and GridFS utilities
-│   └── Swagger.config.ts          # Swagger UI setup
-├── models/                        # Mongoose schemas and models
-│   ├── Company.ts                 # Restaurant company/group model
-│   ├── Restaurant.ts              # Individual restaurant locations
-│   ├── Menu.ts                    # Menu items nested by type (appetizer, entree, etc.)
-│   ├── DashboardUser.ts           # Admin/manager/employee accounts
-│   ├── Transaction.ts             # Discount redemption records
-│   └── Notification.ts            # Platform announcements
-└── @types/                        # TypeScript type definitions
-    ├── models.d.ts                # Type definitions for Mongoose models
-    ├── express.d.ts               # Custom Express request/response types
-    └── validation.d.ts            # Validation-related types
+│   ├── config.ts                  # App configuration
+│   ├── cors.ts                    # CORS settings
+│   ├── mongo.ts                   # MongoDB connection + GridFS
+│   ├── log4.ts                    # Logger configuration
+│   ├── authAdmin.ts               # Admin role verification
+│   ├── authUser.ts                # User authentication
+│   ├── errorHandler.ts            # Global error handler
+│   ├── session.ts                 # Session configuration
+│   └── Swagger.config.ts          # API documentation setup
+│
+├── models/                        # Mongoose schemas
+│   ├── Company.ts                 # Company model
+│   ├── Restaurant.ts              # Restaurant model
+│   ├── Menu.ts                    # Menu model
+│   ├── DashboardUser.ts           # User model with roles
+│   ├── Transaction.ts             # Transaction model
+│   ├── Notification.ts            # Notification model
+│   └── index.ts                   # Model exports
+│
+├── constants/                     # Static configuration
+│   ├── errorMessage.ts            # Error message constants
+│   ├── rules.ts                   # Validation rules
+│   ├── validation.ts              # Validation schemas
+│   ├── language/
+│   │   └── japan.ts               # Japanese translations
+│   └── ...
+│
+├── locales/                       # i18n translations
+│   ├── I18-locale.ts              # Locale configuration
+│   ├── Language.ts                # Language types
+│   └── json/
+│       ├── en.json                # English translations
+│       └── ja.json                # Japanese translations
+│
+└── @types/                        # TypeScript definitions
+    ├── express.d.ts               # Custom Express types
+    ├── models.d.ts                # Model type definitions
+    ├── validation.d.ts            # Validation types
+    └── ...
 ```
 
-### Design Patterns I Used
+### Data Flow
 
-**Component-Based Architecture**: Organized by feature (`auth`, `dashboard`) instead of technical layer (controllers, services, models all in one directory):
-- Each component is self-contained with its own controller, service, validation, and docs
-- Easy to add new features
-- Clear separation of concerns within each component
+1. **Authentication Flow**
+   ```
+   POST /users/auth/login → Controller receives email/password → 
+   Service finds user in MongoDB → Bcrypt compares password hash → 
+   JWT generated with user ID and role → Token returned to client → 
+   Client stores token → Subsequent requests include Authorization header → 
+   Middleware verifies JWT → Extracts user from token → Attaches to req.user
+   ```
 
-**Controller → Service → Model Pattern**:
-- **Controllers** handle HTTP request/response, call services, and send responses
-- **Services** contain business logic (calculating profits, aggregating data, interacting with multiple models)
-- **Models** define data schemas and database interactions
-- Keeps controllers thin and services testable
+2. **CRUD Operation Flow (Example: Create Restaurant)**
+   ```
+   Dashboard sends POST /users/dashboard/restaurants with FormData → 
+   authAdmin middleware verifies JWT and checks role === 'admin' → 
+   Multer parses multipart/form-data and extracts logo file → 
+   Express-validator validates name, location, category → 
+   Controller calls GridFS utility to save logo → 
+   GridFS returns file ID → 
+   Controller creates Restaurant document with logo reference → 
+   Mongoose saves to MongoDB → 
+   Response returns restaurant object → 
+   Mobile app queries same collection → Users see new restaurant
+   ```
 
-**Middleware-Based Security**:
-- `authAdmin` and `authUser` middleware wrap protected routes
-- JWT verification happens once in middleware, then `req.user` is available to all downstream handlers
-- Role-based checks in controllers: `if (user.status !== 'admin') return 403`
+3. **Image Upload Flow**
+   ```
+   Admin selects image → Dashboard sends FormData with file → 
+   Multer middleware intercepts request → 
+   File buffer stored in memory → 
+   saveImageToGridFS(buffer, filename, mimetype) → 
+   GridFS creates upload stream → 
+   Stream writes chunks to uploads.chunks collection → 
+   Metadata saved to uploads.files collection → 
+   Returns GridFS ObjectId → 
+   Controller stores ID in restaurant/menu document → 
+   Frontend requests /images/:imageId → 
+   getImageFromGridFS(imageId) creates download stream → 
+   Stream pipes to HTTP response → Client displays image
+   ```
 
-**GridFS Abstraction**:
-- Wrapped GridFSBucket's stream API in utility functions (`saveImageToGridFS`, `getImageFromGridFS`)
-- Controllers don't need to understand MongoDB streams
-- Makes it easy to swap GridFS for S3 later if needed
+4. **Role-Based Access Control**
+   ```
+   User logs in → JWT payload includes { userId, email, status: 'admin' } → 
+   Admin attempts to access /users/dashboard/companies → 
+   authAdmin middleware extracts JWT from Authorization header → 
+   jwt.verify() validates signature and expiration → 
+   Middleware checks user.status === 'admin' → 
+   If not admin, returns 403 Forbidden → 
+   If admin, calls next() → Controller executes → 
+   Data returned
+   ```
 
-**Type-Safe Request Handling**:
-- Custom Express types extend `Request` to include `req.user` and `req.language`
-- TypeScript catches typos like `req.usr` at compile time
-- Auto-complete for model fields in controllers
+5. **Transaction Recording Flow**
+   ```
+   Manager records sale in dashboard → 
+   POST /users/dashboard/transactions with product data → 
+   authUser middleware verifies JWT → 
+   Controller checks user.status === 'manager' → 
+   Transaction document created with companyId from req.user → 
+   Mongoose saves to transactions collection → 
+   Manager refreshes dashboard → 
+   GET /users/dashboard/popularproducts → 
+   Aggregation pipeline groups by productName → 
+   Calculates total quantity sold → 
+   Sorts by popularity → 
+   Returns top 5 products → Chart updates
+   ```
 
-## Key Features
+### Key Design Patterns
+
+- **Controller → Service → Model Pattern:** Controllers handle HTTP, services contain business logic, models define schemas
+- **Middleware-Based Security:** JWT verification and role checks happen in reusable middleware
+- **Centralized Error Handling:** All errors pass through global error handler for consistent formatting
+- **GridFS Abstraction:** Utility functions wrap GridFS API for cleaner controller code
+- **Type-Safe Request Handling:** Custom Express types extend Request to include `req.user` and `req.language`
+- **Component-Based Organization:** Features isolated in self-contained folders with controllers, services, and validation
+
+---
+
+## Features
 
 ### Authentication & Authorization
-- **JWT-based auth**: Login returns a token, subsequent requests include `Authorization: Bearer <token>`
-- **Role-based access control**: Middleware checks user role before allowing access to admin/manager-only endpoints
-- **Password security**: Bcrypt hashing with salt rounds, pre-save hooks for automatic hashing
-- **Token refresh**: Refresh token stored in DB for long-lived sessions (not fully implemented)
+- **JWT-based authentication** with stateless token verification
+- **Role-based access control** (Admin/Manager/Employee roles)
+- **Password security** with bcrypt hashing and salt rounds
+- **Session management** with connect-mongo (development only)
+- **Token refresh** mechanism (partially implemented)
 
-### Company & Restaurant Management
-- **CRUD operations**: Admins can create, read, update, and delete companies and restaurants
-- **Image upload to GridFS**: Restaurant logos and menu photos stored in MongoDB
-- **Company hierarchy**: Companies have many restaurants, restaurants have many menu items
-- **Category filtering**: Restaurants tagged by cuisine (Asian, Fastfood, Café, Grill)
+### Company Management (Admin Only)
+- **CRUD operations** for restaurant companies/groups
+- **User counting** by role (managers/employees per company)
+- **Transaction aggregation** for company analytics
+- **Popular products** calculation with MongoDB aggregation pipeline
 
-### Menu Management
-- **Nested menu structure**: Menus stored as objects with type keys (appetizers, entrees) containing item objects
-- **Dynamic menu updates**: Adding a menu item updates the nested structure using `$set` operator
-- **Image association**: Each menu item can have an image stored in GridFS
-- **Discount tracking**: Menu items flagged with `discount: true` and associated barcode images
+### Restaurant Management (Admin Only)
+- **Create/edit/delete** restaurants with location and category
+- **Logo upload** to GridFS with streaming
+- **Restaurant details** endpoint with nested menu data
+- **Category filtering** (Asian, Fastfood, Café, Grill, Vegetarian)
 
-### User Management
-- **Three-tier user system**: Admin, Manager, Employee roles with different permissions
-- **Company assignment**: Users linked to companies via `companyId` reference
-- **User search and filtering**: Query users by role or company
-- **Bulk user operations**: Create multiple employees under a manager's company
+### Menu Management (Admin Only)
+- **Dynamic menu creation** with nested structure (appetizers, entrees, desserts)
+- **Menu item CRUD** with images and discount flags
+- **Barcode association** for discount redemption
+- **Image storage** in GridFS for menu photos
+
+### User Management (Admin Only)
+- **Create manager accounts** assigned to companies
+- **User search and filtering** by role
+- **Bulk user operations** with company assignment
+- **Password change** with automatic hashing
+
+### Employee Management (Manager Only)
+- **Create employee accounts** within manager's company
+- **Employee CRUD** operations restricted to company scope
+- **Company-scoped queries** using manager's companyId
+
+### Transaction Recording (Manager Only)
+- **Log discount redemptions** when customers use coupons
+- **Product analytics** with aggregation pipelines
+- **Profit calculations** based on cost and discount
+- **Date-based filtering** for reporting
 
 ### Notifications System
-- **Company-specific announcements**: Admins send notifications to specific companies
-- **Platform-wide alerts**: Broadcast messages to all users
-- **Notification history**: Users can view past notifications
+- **Company-specific announcements** from admins
+- **Platform-wide alerts** to all users
+- **Notification history** with company details included
+- **CRUD operations** restricted by role
 
 ### Image Serving via GridFS
-- **Dynamic image retrieval**: `/images/:imageId` endpoint streams images from GridFS
-- **Efficient streaming**: Uses Node.js streams to pipe images to the response (no buffering entire file in memory)
-- **Content-Type handling**: Automatically sets correct MIME type based on GridFS metadata
+- **Dynamic image retrieval** at `/images/:imageId`
+- **Efficient streaming** with Node.js streams (no memory buffering)
+- **Content-Type handling** from GridFS metadata
+- **Logo and menu photo delivery** to dashboard and mobile app
 
-## What I Learned
+---
 
-### Technical Skills Gained
-
-**TypeScript in Production**: Using TypeScript for a backend API was a pleasant experience. The type system caught so many bugs before runtime
-- Misspelled model fields surfaced at compile time
-- Request body types enforced with express-validator + TypeScript
-- IDE autocomplete for Mongoose models made writing queries faster
-
-**MongoDB & Mongoose Deep Dive**: Learned way more about document databases than I expected
-- Designing schemas for nested data (menus with multiple types and items)
-- Using aggregation pipelines for analytics (popular products query uses `$group` and `$sort`)
-- GridFS for binary file storage
-- Pre-save hooks for automatically hashing passwords
-
-**Authentication Patterns**: Building JWT auth from scratch taught me
-- How JWTs work under the hood (header, payload, signature)
-- Why stateless auth is better for scaling (no session store bottleneck)
-- Middleware patterns for protecting routes
-- The difference between authentication (who you are) and authorization (what you can do)
-
-**RESTful API Design**: Learned best practices for structuring endpoints
-- Resource-based URLs (`/companies/:id` not `/getCompany?id=123`)
-- HTTP method semantics (GET for reads, POST for creates, PUT for updates, DELETE for deletes)
-- Proper status codes (200, 201, 400, 401, 403, 404, 500)
-- Consistent response structure (`{ message: string, data?: any }`)
-
-**File Uploads & Streaming**: Handling multipart/form-data and binary files was tricky
-- Multer for parsing file uploads (kept crashing until I configured memory storage correctly)
-- GridFS streams for efficient large file handling
-- Setting correct Content-Type headers for serving images
-- Debugging why files weren't appearing in GridFS (forgot to call `uploadStream.end()`)
-
-### Challenges Overcome
-
-**GridFS Integration**: MongoDB's GridFS documentation is sparse. Took days to figure out:
-- How to initialize `GridFSBucket` after the MongoDB connection
-- Why files weren't appearing (needed to listen for `finish` event on upload stream)
-- How to retrieve files by ID (had to convert string ID to `ObjectId`)
-- Streaming images to Express responses without loading entire file into memory
-
-**TypeScript + Mongoose**: Getting Mongoose models to work with TypeScript was painful:
-- Had to define both a schema and a TypeScript interface for each model
-- Mongoose's type definitions were incomplete (had to create custom types in `@types/models.d.ts`)
-- Pre-save hooks lost type information (`this` was `any` until I figured out type assertions)
-- PaginateModel types required custom typing
-
-**Role-Based Access Control**: Implementing RBAC without a library taught me:
-- How to structure middleware for different permission levels
-- Why storing the role in the JWT payload is convenient but risky (changing roles requires re-login)
-- How to handle cascading permissions (admin can do everything managers can do)
-
-**CORS Configuration**: The dashboard and mobile app both hit this API, but from different origins:
-- Had to configure CORS to allow multiple origins (dashboard on Railway, mobile app on localhost during dev)
-- Preflight requests (OPTIONS) needed special handling
-- Cookies didn't work cross-origin (switched to Authorization headers)
-
-**Deployment on AWS**: First time using CodeDeploy and writing deployment scripts:
-- Bash scripts for stopping/starting the app
-- Managing environment variables in production (DATABASE_URL, JWT_SECRET)
-- Port conflicts when the old container didn't stop cleanly
-- Docker networking issues when the container couldn't reach MongoDB
-
-**Validation Logic**: Express-validator is powerful but verbose:
-- Wrote a lot of validation chains (`body('email').isEmail().normalizeEmail()`)
-- Had to manually check validation results in controllers at first
-- Later extracted validation into separate files and used middleware to check results
-- Localized error messages by mapping validation errors to i18n keys
-
-### If I Built This Again
-
-**Use a Framework like NestJS**: Express is flexible but barebones. NestJS would've given me
-- Dependency injection out of the box
-- Decorators for route definitions and validation
-- Built-in TypeScript support with less boilerplate
-- Better project structure conventions
-
-**Add Unit & Integration Tests**: Didn't write tests during development. Would add
-- Jest for unit tests (test services in isolation)
-- Supertest for integration tests (test full request/response cycles)
-- Test database seeding for predictable test data
-- Automated testing in CI/CD pipeline
-
-**Use AWS S3 Instead of GridFS**: GridFS worked but added complexity
-- S3 is designed for file storage, MongoDB isn't
-- S3 gives you automatic backups, CDN integration, and better performance at scale
-- GridFS complicates MongoDB backups (need to back up both collections and files.chunks)
-
-**GraphQL Instead of REST**: For the dashboard and mobile app, GraphQL would've been better:
-- Frontend could request exactly the fields it needs (no overfetching)
-- Single endpoint instead of 40+ REST routes
-- Built-in documentation (no Swagger setup needed)
-- Real-time updates with subscriptions (for notifications)
-
-**Refactor Validation**: Express-validator works but validation logic is scattered:
-- Would use Zod or Joi for centralized schema validation
-- Define schemas once and use them for validation, TypeScript types, and API docs
-- Easier to keep validation logic in sync with TypeScript types
-
-## Getting Started
+## Installation & Development
 
 ### Prerequisites
-- Node.js 18+ and npm
+- Node.js 18+
+- npm or yarn
 - MongoDB 6+ instance (local or cloud)
-- Environment variables (see below)
+- Environment variables configured
 
-### Environment Variables
+### Local Development
 
-Create a `.env` file in the root:
+```bash
+# Clone the repository
+git clone https://github.com/JamieJiHeonKim/bizmunch_dashboard_services.git
+cd bizmunch_dashboard_services
 
-```env
-# Server
+# Install dependencies
+npm install
+
+# Set up environment variables
+# Create a .env file with:
 PORT=3001
 NODE_ENV=development
-
-# Database
 DB_PROTOCOL=mongodb+srv
 DB_USER=your_mongodb_username
 DB_PASS=your_mongodb_password
 DB_HOST=your_cluster.mongodb.net
 DB_NAME=bizmunch
-
-# Authentication
 JWT_SECRET=your_super_secret_jwt_key
 COOKIE_SECRET=your_cookie_secret
-
-# Session
 SESSION_SECRET=your_session_secret
-```
-
-### Installation
-
-```bash
-# Install dependencies
-npm install
 
 # Run in development mode with auto-reload
 npm run dev
 
+# Open http://localhost:3001
+```
+
+### Production Build
+
+```bash
 # Build TypeScript to JavaScript
 npm run build
 
-# Run production build
+# Start production server
 npm start
-```
 
-The API will start at `http://localhost:3001`.
+# Or use PM2 for process management
+npm run start:pm2
+```
 
 ### API Documentation
 
 Once the server is running, visit `http://localhost:3001/api-docs` to view the interactive Swagger UI documentation.
 
-### Testing Endpoints
+---
 
-Example login request:
-
-```bash
-curl -X PUT http://localhost:3001/users/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@example.com", "password": "password123"}'
-```
-
-Response:
-
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "_id": "507f1f77bcf86cd799439011",
-    "email": "admin@example.com",
-    "name": "Admin User",
-    "status": "admin"
-  }
-}
-```
-
-Use the token in subsequent requests:
-
-```bash
-curl -X GET http://localhost:3001/users/dashboard/companies \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE"
-```
+## Deployment
 
 ### Docker Deployment
+
+This project includes a multi-stage Dockerfile for optimized production builds:
+
+```dockerfile
+# Stage 1: Build
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# Stage 2: Production
+ENV NODE_ENV=production
+ENV PORT=3001
+EXPOSE 3001
+CMD ["npm", "run", "start"]
+```
+
+**Deploy Steps:**
 
 ```bash
 # Build the Docker image
@@ -438,81 +491,314 @@ docker build -t bizmunch-api .
 docker run -p 3001:3001 --env-file .env bizmunch-api
 ```
 
-For production deployment with Docker Compose:
+### AWS CodeDeploy
+
+This project is configured for AWS CodeDeploy with `appspec.yml`:
 
 ```yaml
-version: '3.8'
-services:
-  api:
-    build: .
-    ports:
-      - "3001:3001"
-    environment:
-      - NODE_ENV=production
-      - DB_PROTOCOL=mongodb+srv
-      - DB_HOST=${DB_HOST}
-      - DB_USER=${DB_USER}
-      - DB_PASS=${DB_PASS}
-      - DB_NAME=bizmunch
-      - JWT_SECRET=${JWT_SECRET}
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /home/ec2-user/app
+hooks:
+  BeforeInstall:
+    - location: scripts/before_install.sh
+      timeout: 300
+  ApplicationStop:
+    - location: scripts/application_stop.sh
+      timeout: 300
+  ApplicationStart:
+    - location: scripts/application_start.sh
+      timeout: 300
 ```
 
-## API Endpoints Overview
+**Deployment Scripts:**
 
-### Authentication (`/users/auth`)
-- `PUT /login` - User login (returns JWT)
-- `POST /register` - Register new user (admin only)
-- `PUT /password/change` - Change user password
-- `PUT /profile` - Update user profile
+- `before_install.sh` - Installs Node.js, npm, and cleans up old files
+- `application_stop.sh` - Stops running Docker container
+- `application_start.sh` - Builds and starts new Docker container
 
-### Companies (`/users/dashboard/companies`)
-- `GET /` - List all companies (admin only)
-- `POST /` - Create company (admin only)
-- `GET /:id` - Get company details (admin only)
-- `PUT /:id` - Update company (admin only)
-- `DELETE /:id` - Delete company (admin only)
+**Deploy Steps:**
+1. Push code to GitHub
+2. AWS CodeDeploy pipeline triggers
+3. EC2 instance pulls latest code
+4. Deployment scripts execute in order
+5. Application restarts with zero downtime
 
-### Restaurants (`/users/dashboard/restaurants`)
-- `GET /` - List all restaurants (admin only)
-- `POST /` - Create restaurant with logo upload (admin only)
-- `GET /:id` - Get restaurant details with menu (admin only)
-- `PUT /:id` - Update restaurant (admin only)
-- `DELETE /:id` - Delete restaurant (admin only)
+---
 
-### Menus (`/users/dashboard/menu`)
-- `POST /:restaurantId` - Add menu item with image upload (admin only)
+## API Integration
 
-### Users (`/users/dashboard/users`)
-- `GET /` - List all users (admin only)
-- `GET /search` - Search users by role (admin only)
-- `POST /managers` - Create manager account (admin only)
-- `GET /:id` - Get user details (admin only)
-- `PUT /:id` - Update user (admin only)
-- `DELETE /:id` - Delete user (admin only)
+All API endpoints are documented in Swagger UI. The backend communicates with the frontend dashboard and mobile app via REST API.
 
-### Employees (`/users/dashboard/employees`)
-- `GET /` - List employees in manager's company (manager only)
-- `POST /` - Create employee (manager only)
-- `GET /:id` - Get employee details (manager only)
-- `PUT /:id` - Update employee (manager only)
-- `DELETE /:id` - Delete employee (manager only)
+### Authentication Endpoints
+```javascript
+PUT  /users/auth/login              // Login (returns JWT + user object)
+POST /users/auth/register           // Register new user (admin only)
+PUT  /users/auth/password/change    // Change password
+PUT  /users/auth/profile            // Update user profile
+```
 
-### Transactions (`/users/dashboard/transactions`)
-- `GET /` - List transactions for user's company
-- `POST /` - Create transaction record (manager only)
-- `GET /:id` - Get transaction details
+### Company Endpoints (Admin Only)
+```javascript
+GET    /users/dashboard/companies                    // List all companies
+POST   /users/dashboard/companies                    // Create company
+GET    /users/dashboard/companies/:id                // Get company details
+PUT    /users/dashboard/companies/:id                // Update company
+DELETE /users/dashboard/companies/:id                // Delete company
+GET    /users/dashboard/companies/:id/transactions   // Get company transactions
+GET    /users/dashboard/companies/:id/popularproducts // Get popular products
+```
 
-### Notifications (`/users/dashboard/notifications`)
-- `GET /` - List all notifications (admin only)
-- `POST /` - Create notification (admin only)
-- `GET /company` - Get company-specific notifications (manager/employee)
-- `GET /:id` - Get notification details (admin only)
-- `PUT /:id` - Update notification (admin only)
-- `DELETE /:id` - Delete notification (admin only)
+### Restaurant Endpoints (Admin Only)
+```javascript
+GET    /users/dashboard/restaurants                  // List all restaurants
+POST   /users/dashboard/restaurants                  // Create restaurant (with logo upload)
+GET    /users/dashboard/restaurants/:id              // Get restaurant details
+PUT    /users/dashboard/restaurants/:id              // Update restaurant
+DELETE /users/dashboard/restaurants/:id              // Delete restaurant
+GET    /users/dashboard/restaurant/:id/details       // Get restaurant with menu
+```
 
-### Images (`/users/dashboard/images`)
-- `GET /:imageId` - Retrieve image from GridFS (streams image data)
+### Menu Endpoints (Admin Only)
+```javascript
+POST /users/dashboard/menu/:restaurantId             // Add menu item (with image/barcode upload)
+```
+
+### User Management Endpoints (Admin Only)
+```javascript
+GET    /users/dashboard/users                        // List all users
+GET    /users/dashboard/users/search?status=manager  // Search users by role
+POST   /users/dashboard/managers                     // Create manager
+GET    /users/dashboard/user/:id                     // Get user details
+PUT    /users/dashboard/user/:id                     // Update user
+DELETE /users/dashboard/user/:id                     // Delete user
+```
+
+### Employee Management Endpoints (Manager Only)
+```javascript
+GET    /users/dashboard/employees            // List employees in manager's company
+POST   /users/dashboard/employees            // Create employee
+GET    /users/dashboard/employees/:id        // Get employee details
+PUT    /users/dashboard/employees/:id        // Update employee
+DELETE /users/dashboard/employees/:id        // Delete employee
+```
+
+### Transaction Endpoints
+```javascript
+GET  /users/dashboard/transactions          // List transactions for user's company
+POST /users/dashboard/transactions          // Create transaction (manager only)
+GET  /users/dashboard/transactions/:id      // Get transaction details
+GET  /users/dashboard/popularproducts       // Get popular products for company
+GET  /users/dashboard/company/:id/details   // Get company dashboard data
+```
+
+### Notification Endpoints
+```javascript
+GET    /users/dashboard/notifications                // List all notifications (admin)
+POST   /users/dashboard/notifications                // Create notification (admin)
+GET    /users/dashboard/notifications/company        // Get company notifications
+GET    /users/dashboard/notifications/:id            // Get notification details (admin)
+PUT    /users/dashboard/notifications/:id            // Update notification (admin)
+DELETE /users/dashboard/notifications/:id            // Delete notification (admin)
+```
+
+### Image Endpoints
+```javascript
+GET /users/dashboard/images/:imageId                 // Retrieve image from GridFS (streams)
+```
+
+### Request/Response Format
+
+**Authentication Header:**
+```javascript
+Authorization: Bearer <JWT_TOKEN>
+```
+
+**Example Request (Create Restaurant):**
+```javascript
+POST /users/dashboard/restaurants
+Content-Type: multipart/form-data
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+FormData:
+  name: "Downtown Burgers"
+  location: "123 Main St, Tokyo"
+  category: "Fastfood"
+  managerName: "John Doe"
+  managerEmail: "john@example.com"
+  logo: <File>
+```
+
+**Example Response:**
+```json
+{
+  "status": 201,
+  "message": "Restaurant created successfully",
+  "data": {
+    "_id": "60d5ec49f1b2c8b1f8e4e1a1",
+    "name": "Downtown Burgers",
+    "location": "123 Main St, Tokyo",
+    "category": "Fastfood",
+    "managerName": "John Doe",
+    "managerEmail": "john@example.com",
+    "logo": "60d5ec49f1b2c8b1f8e4e1a1"
+  }
+}
+```
+
+**Example Request (Login):**
+```bash
+curl -X PUT http://localhost:3001/users/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@example.com", "password": "password123"}'
+```
+
+**Example Response:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "_id": "507f1f77bcf86cd799439011",
+    "email": "admin@example.com",
+    "name": "Admin User",
+    "status": "admin",
+    "companyId": "507f1f77bcf86cd799439012"
+  }
+}
+```
+
+---
+
+## What I Learned
+
+### Technical Skills Gained
+
+**TypeScript in Production**
+- Type safety caught bugs during development that would've been runtime errors in JavaScript
+- Better IDE autocomplete when working with Mongoose models and Express request/response types
+- Enforced consistent data shapes across controllers, services, and models
+- Made refactoring safer - changing a model field immediately surfaced everywhere it was used
+- Learned to write custom type definitions when library types were incomplete
+
+**MongoDB & Mongoose Deep Dive**
+- Designing schemas for nested data structures (menus with multiple types and items)
+- Using aggregation pipelines for analytics (`$group`, `$sort`, `$limit` for popular products)
+- GridFS for binary file storage - it's basically a filesystem API on top of MongoDB
+- Pre-save hooks for automatically hashing passwords before insertion
+- Understanding when to use references vs. embedded documents
+- Managing MongoDB connection pooling and handling connection errors
+
+**Authentication & Authorization Patterns**
+- Built JWT auth from scratch - learned how JWTs work (header, payload, signature)
+- Why stateless auth is better for horizontal scaling (no session store bottleneck)
+- Middleware patterns for protecting routes and checking user roles
+- The difference between authentication (who you are) and authorization (what you can do)
+- Implementing role-based access control without a library
+
+**RESTful API Design**
+- Resource-based URLs (`/companies/:id` not `/getCompany?id=123`)
+- HTTP method semantics (GET for reads, POST for creates, PUT for updates, DELETE for deletes)
+- Proper status codes (200, 201, 400, 401, 403, 404, 500)
+- Consistent response structure for success and error cases
+- Versioning strategies (though not implemented in this project)
+
+**File Upload & Streaming**
+- Handling multipart/form-data with Multer (memory vs. disk storage)
+- GridFS streams for efficient large file handling (no memory bloat)
+- Setting correct Content-Type headers for serving images
+- Buffer management when dealing with file uploads
+- Error handling when streams fail mid-transfer
+
+### Challenges Overcome
+
+**GridFS Integration**
+- MongoDB's GridFS documentation is sparse - took days to figure out the streaming API
+- How to initialize `GridFSBucket` after the MongoDB connection
+- Why files weren't appearing (needed to listen for `finish` event on upload stream)
+- How to retrieve files by ID (had to convert string ID to `ObjectId`)
+- Streaming images to Express responses without loading entire file into memory
+
+**TypeScript + Mongoose Compatibility**
+- Getting Mongoose models to work with TypeScript was painful
+- Had to define both a Mongoose schema and a TypeScript interface for each model
+- Mongoose's type definitions were incomplete (created custom types in `@types/models.d.ts`)
+- Pre-save hooks lost type information (`this` was `any` until I figured out type assertions)
+- PaginateModel types required custom typing with generics
+
+**Role-Based Access Control Implementation**
+- Structuring middleware for different permission levels
+- Why storing the role in the JWT payload is convenient but risky (changing roles requires re-login)
+- How to handle cascading permissions (admin can do everything managers can do)
+- Preventing privilege escalation attacks
+
+**CORS Configuration**
+- Dashboard and mobile app both hit this API from different origins
+- Had to configure CORS to allow multiple origins (Railway + localhost during dev)
+- Preflight requests (OPTIONS) needed special handling
+- Cookies didn't work cross-origin (switched to Authorization headers with JWT)
+
+**Deployment on AWS**
+- First time using CodeDeploy and writing bash deployment scripts
+- Managing environment variables in production without committing secrets
+- Port conflicts when the old container didn't stop cleanly
+- Docker networking issues when the container couldn't reach MongoDB
+- Debugging production-only bugs (missing dependencies, environment config)
+
+### If I Built This Again
+
+**Use NestJS Framework**
+- Express is flexible but barebones - had to set up everything manually
+- NestJS provides dependency injection, decorators for routes, built-in TypeScript support
+- Less boilerplate for validation, error handling, and API documentation
+- Better project structure conventions out of the box
+
+**Add Comprehensive Testing**
+- Didn't write tests during development (huge mistake for maintenance)
+- Would add Jest for unit tests (test services in isolation)
+- Supertest for integration tests (test full request/response cycles)
+- Test database seeding for predictable test data
+- Automated testing in CI/CD pipeline before deployment
+
+**Use AWS S3 Instead of GridFS**
+- GridFS worked but added complexity to MongoDB backups
+- S3 is designed for file storage - MongoDB isn't
+- S3 gives automatic backups, CDN integration, and better performance at scale
+- GridFS complicates MongoDB backups (need to back up both collections and chunks)
+
+**GraphQL Instead of REST**
+- For the dashboard and mobile app, GraphQL would've been better
+- Frontend could request exactly the fields it needs (no overfetching)
+- Single endpoint instead of 40+ REST routes
+- Built-in documentation (no Swagger setup needed)
+- Real-time updates with subscriptions (perfect for notifications)
+
+**Better Logging & Monitoring**
+- Log4js is basic - would use Winston or Pino for structured logging
+- Add log aggregation with CloudWatch or Datadog
+- Request tracing to correlate logs across services
+- Performance monitoring (response times, database query times)
+- Error tracking with Sentry or Rollbar
+
+**Schema Validation with Zod**
+- Express-validator works but validation logic is scattered
+- Zod defines schemas once, uses for validation, TypeScript types, and API docs
+- Easier to keep validation logic in sync with TypeScript types
+- Better developer experience with type inference
+
+---
 
 ## License
 
-This project is part of my portfolio. Feel free to look around, but please don't copy it wholesale for your own portfolio.
+MIT License - See LICENSE file for details
+
+---
+
+**Tech Stack Summary**: TypeScript, Node.js 18, Express.js, MongoDB, Mongoose, GridFS, JWT, Passport.js, Bcrypt, Multer, Express-validator, Log4js, Swagger UI, i18next, Docker, AWS CodeDeploy
+
+**Related Repositories**:
+- Dashboard Frontend (React): [bizmunch-dashboard-site](https://github.com/JamieJiHeonKim/bizmunch_dashboard_site)
+- Mobile App (React Native): *Unfortunately the mobile app is not available for showcase*
+
+**Note:** This is the backend API only. The frontend dashboard and React Native mobile app are in separate repositories.
